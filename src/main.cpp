@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
+#include <cstdio> 
 
 int main() {
     srand((unsigned int)time(nullptr));
