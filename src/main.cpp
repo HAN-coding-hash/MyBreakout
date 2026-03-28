@@ -47,67 +47,72 @@ int main() {
             ball.Launch(paddle.GetRect().x + paddle.GetRect().width / 2);
         }
         
-        if (!gameOver) {
+        if (!gameOver && ball.IsLaunched()) {
             ball.Move();
             ball.BounceEdge(screenWidth, screenHeight);
             
-            // 挡板碰撞（正确版本）
+            // ========== 挡板碰撞 ==========
             Rectangle paddleRect = paddle.GetRect();
-            if (ball.GetPosition().y + ball.GetRadius() >= paddleRect.y &&
-                ball.GetPosition().y - ball.GetRadius() <= paddleRect.y + paddleRect.height &&
-                ball.GetPosition().x + ball.GetRadius() >= paddleRect.x &&
-                ball.GetPosition().x - ball.GetRadius() <= paddleRect.x + paddleRect.width) {
+            Vector2 ballPos = ball.GetPosition();
+            Vector2 ballSpeed = ball.GetSpeed();
+            float ballRadius = ball.GetRadius();
+            
+            // 检查球是否碰到挡板（只处理向下运动的球）
+            if (ballSpeed.y > 0 &&
+                ballPos.y + ballRadius >= paddleRect.y &&
+                ballPos.y + ballRadius <= paddleRect.y + paddleRect.height + ballSpeed.y &&
+                ballPos.x + ballRadius >= paddleRect.x &&
+                ballPos.x - ballRadius <= paddleRect.x + paddleRect.width) {
                 
                 // 计算击中点偏移（-1到1）
-                float hitPoint = (ball.GetPosition().x - (paddleRect.x + paddleRect.width/2)) / (paddleRect.width/2);
+                float hitPoint = (ballPos.x - (paddleRect.x + paddleRect.width/2)) / (paddleRect.width/2);
                 if (hitPoint < -1) hitPoint = -1;
                 if (hitPoint > 1) hitPoint = 1;
                 
-                // 根据击中点计算反弹角度
-                float angle = hitPoint * 60.0f;  // -60° 到 60°
+                // 根据击中点计算反弹角度（-60° 到 60°）
+                float angle = hitPoint * 60.0f;
                 float rad = angle * 3.14159f / 180.0f;
                 
-                // 保持速度大小，改变方向
-                Vector2 currentSpeed = ball.GetSpeed();
-                float speedMagnitude = sqrt(currentSpeed.x * currentSpeed.x + currentSpeed.y * currentSpeed.y);
+                // 保持速度大小，向上反弹
+                float speedMagnitude = sqrt(ballSpeed.x * ballSpeed.x + ballSpeed.y * ballSpeed.y);
                 if (speedMagnitude < 5) speedMagnitude = 5;
+                if (speedMagnitude > 12) speedMagnitude = 12;
                 
-                ball.SetSpeed({speedMagnitude * sin(rad), -speedMagnitude * cos(rad)});
+                float newSpeedX = speedMagnitude * sin(rad);
+                float newSpeedY = -speedMagnitude * cos(rad);
                 
-                // 修正位置，避免卡在挡板里
+                ball.SetSpeed({newSpeedX, newSpeedY});
+                
+                // 修正位置：放到挡板上面一点，避免重复碰撞
                 ball.ResetToPaddle(paddleRect.x + paddleRect.width / 2, paddleRect.y);
+                // 重要：ResetToPaddle 会把 launched 设为 false，这里要重新设为 true
+                ball.Launch(paddleRect.x + paddleRect.width / 2);
             }
             
-            // 砖块碰撞（正确版本）
+            // ========== 砖块碰撞 ==========
             for (auto& brick : bricks) {
                 if (brick.IsActive()) {
                     Rectangle brickRect = brick.GetRect();
                     
-                    // 检测碰撞
                     if (CheckCollisionCircleRec(ball.GetPosition(), ball.GetRadius(), brickRect)) {
                         brick.SetActive(false);
                         
                         // 计算碰撞方向
-                        float overlapLeft = (ball.GetPosition().x + ball.GetRadius()) - brickRect.x;
-                        float overlapRight = (brickRect.x + brickRect.width) - (ball.GetPosition().x - ball.GetRadius());
-                        float overlapTop = (ball.GetPosition().y + ball.GetRadius()) - brickRect.y;
-                        float overlapBottom = (brickRect.y + brickRect.height) - (ball.GetPosition().y - ball.GetRadius());
-                        
-                        // 找到最小的重叠量，决定碰撞方向
-                        float minOverlap = overlapLeft;
-                        int direction = 0; // 0:左, 1:右, 2:上, 3:下
-                        
-                        if (overlapRight < minOverlap) { minOverlap = overlapRight; direction = 1; }
-                        if (overlapTop < minOverlap) { minOverlap = overlapTop; direction = 2; }
-                        if (overlapBottom < minOverlap) { minOverlap = overlapBottom; direction = 3; }
-                        
-                        // 根据方向反弹
                         Vector2 currentSpeed = ball.GetSpeed();
-                        if (direction == 0 || direction == 1) {
-                            // 左右碰撞：X速度反向
+                        float ballCenterX = ball.GetPosition().x;
+                        float ballCenterY = ball.GetPosition().y;
+                        float brickCenterX = brickRect.x + brickRect.width/2;
+                        float brickCenterY = brickRect.y + brickRect.height/2;
+                        
+                        float dx = ballCenterX - brickCenterX;
+                        float dy = ballCenterY - brickCenterY;
+                        
+                        // 根据重叠程度决定反弹方向
+                        if (fabs(dx) > fabs(dy)) {
+                            // 水平碰撞
                             ball.SetSpeed({-currentSpeed.x, currentSpeed.y});
                         } else {
-                            // 上下碰撞：Y速度反向
+                            // 垂直碰撞
                             ball.SetSpeed({currentSpeed.x, -currentSpeed.y});
                         }
                         
@@ -125,12 +130,13 @@ int main() {
                 }
             }
             
-            // 球掉底
-            if (ball.GetPosition().y > screenHeight) {
+            // ========== 球掉底 ==========
+            if (ball.GetPosition().y + ball.GetRadius() > screenHeight) {
                 lives--;
                 if (lives <= 0) {
                     gameOver = true;
                 } else {
+                    // 重置球到挡板位置，等待发射
                     ball.ResetToPaddle(paddle.GetRect().x + paddle.GetRect().width / 2, paddle.GetRect().y);
                 }
             }
@@ -141,7 +147,7 @@ int main() {
             }
         }
         
-        // 绘制
+        // ========== 绘制 ==========
         BeginDrawing();
         ClearBackground(WHITE);
         
