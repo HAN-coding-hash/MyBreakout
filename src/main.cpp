@@ -5,7 +5,8 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
-#include <cstdio> 
+#include <cstdio>
+#include <cmath>
 
 int main() {
     srand((unsigned int)time(nullptr));
@@ -38,6 +39,7 @@ int main() {
     bool gameOver = false;
     
     while (!WindowShouldClose()) {
+        // 输入处理
         if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) paddle.MoveLeft();
         if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) paddle.MoveRight();
         
@@ -49,41 +51,97 @@ int main() {
             ball.Move();
             ball.BounceEdge(screenWidth, screenHeight);
             
+            // 挡板碰撞（正确版本）
             Rectangle paddleRect = paddle.GetRect();
             if (ball.GetPosition().y + ball.GetRadius() >= paddleRect.y &&
-                ball.GetPosition().x >= paddleRect.x - ball.GetRadius() &&
-                ball.GetPosition().x <= paddleRect.x + paddleRect.width + ball.GetRadius()) {
-                ball.Launch(paddleRect.x + paddleRect.width / 2);
+                ball.GetPosition().y - ball.GetRadius() <= paddleRect.y + paddleRect.height &&
+                ball.GetPosition().x + ball.GetRadius() >= paddleRect.x &&
+                ball.GetPosition().x - ball.GetRadius() <= paddleRect.x + paddleRect.width) {
+                
+                // 计算击中点偏移（-1到1）
+                float hitPoint = (ball.GetPosition().x - (paddleRect.x + paddleRect.width/2)) / (paddleRect.width/2);
+                if (hitPoint < -1) hitPoint = -1;
+                if (hitPoint > 1) hitPoint = 1;
+                
+                // 根据击中点计算反弹角度
+                float angle = hitPoint * 60.0f;  // -60° 到 60°
+                float rad = angle * 3.14159f / 180.0f;
+                
+                // 保持速度大小，改变方向
+                Vector2 currentSpeed = ball.GetSpeed();
+                float speedMagnitude = sqrt(currentSpeed.x * currentSpeed.x + currentSpeed.y * currentSpeed.y);
+                if (speedMagnitude < 5) speedMagnitude = 5;
+                
+                ball.SetSpeed({speedMagnitude * sin(rad), -speedMagnitude * cos(rad)});
+                
+                // 修正位置，避免卡在挡板里
+                ball.ResetToPaddle(paddleRect.x + paddleRect.width / 2, paddleRect.y);
             }
             
+            // 砖块碰撞（正确版本）
             for (auto& brick : bricks) {
-                if (brick.IsActive() && CheckCollisionCircleRec(ball.GetPosition(), ball.GetRadius(), brick.GetRect())) {
-                    brick.SetActive(false);
-                    if (brick.IsGolden()) {
-                        score += 10000;
-                        printf("★★★ 金砖！+10000分！★★★\n");
-                    } else {
-                        score += 10;
+                if (brick.IsActive()) {
+                    Rectangle brickRect = brick.GetRect();
+                    
+                    // 检测碰撞
+                    if (CheckCollisionCircleRec(ball.GetPosition(), ball.GetRadius(), brickRect)) {
+                        brick.SetActive(false);
+                        
+                        // 计算碰撞方向
+                        float overlapLeft = (ball.GetPosition().x + ball.GetRadius()) - brickRect.x;
+                        float overlapRight = (brickRect.x + brickRect.width) - (ball.GetPosition().x - ball.GetRadius());
+                        float overlapTop = (ball.GetPosition().y + ball.GetRadius()) - brickRect.y;
+                        float overlapBottom = (brickRect.y + brickRect.height) - (ball.GetPosition().y - ball.GetRadius());
+                        
+                        // 找到最小的重叠量，决定碰撞方向
+                        float minOverlap = overlapLeft;
+                        int direction = 0; // 0:左, 1:右, 2:上, 3:下
+                        
+                        if (overlapRight < minOverlap) { minOverlap = overlapRight; direction = 1; }
+                        if (overlapTop < minOverlap) { minOverlap = overlapTop; direction = 2; }
+                        if (overlapBottom < minOverlap) { minOverlap = overlapBottom; direction = 3; }
+                        
+                        // 根据方向反弹
+                        Vector2 currentSpeed = ball.GetSpeed();
+                        if (direction == 0 || direction == 1) {
+                            // 左右碰撞：X速度反向
+                            ball.SetSpeed({-currentSpeed.x, currentSpeed.y});
+                        } else {
+                            // 上下碰撞：Y速度反向
+                            ball.SetSpeed({currentSpeed.x, -currentSpeed.y});
+                        }
+                        
+                        // 加分
+                        if (brick.IsGolden()) {
+                            score += 10000;
+                            printf("★★★ 金砖！+10000分！★★★\n");
+                        } else {
+                            score += 10;
+                        }
+                        
+                        winCount--;
+                        break;
                     }
-                    winCount--;
-                    break;
                 }
             }
             
+            // 球掉底
             if (ball.GetPosition().y > screenHeight) {
                 lives--;
                 if (lives <= 0) {
                     gameOver = true;
                 } else {
-                    ball.ResetToPaddle(paddleRect.x + paddleRect.width / 2, paddleRect.y);
+                    ball.ResetToPaddle(paddle.GetRect().x + paddle.GetRect().width / 2, paddle.GetRect().y);
                 }
             }
             
+            // 胜利
             if (winCount <= 0) {
                 gameOver = true;
             }
         }
         
+        // 绘制
         BeginDrawing();
         ClearBackground(WHITE);
         
