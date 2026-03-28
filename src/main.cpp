@@ -43,6 +43,13 @@ int main() {
         if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) paddle.MoveLeft();
         if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) paddle.MoveRight();
         
+        // ========== 未发射时，球跟随挡板移动 ==========
+        if (!ball.IsLaunched()) {
+            float paddleCenterX = paddle.GetRect().x + paddle.GetRect().width / 2;
+            ball.ResetToPaddle(paddleCenterX, paddle.GetRect().y);
+        }
+        
+        // 发射球
         if (!ball.IsLaunched() && IsKeyPressed(KEY_SPACE)) {
             ball.Launch(paddle.GetRect().x + paddle.GetRect().width / 2);
         }
@@ -85,7 +92,7 @@ int main() {
                 
                 // 修正位置：放到挡板上面一点，避免重复碰撞
                 ball.ResetToPaddle(paddleRect.x + paddleRect.width / 2, paddleRect.y);
-                // 重要：ResetToPaddle 会把 launched 设为 false，这里要重新设为 true
+                // 重新设为发射状态
                 ball.Launch(paddleRect.x + paddleRect.width / 2);
             }
             
