@@ -43,7 +43,7 @@ int main() {
         if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) paddle.MoveLeft();
         if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) paddle.MoveRight();
         
-        // ========== 未发射时，球跟随挡板移动 ==========
+        // 未发射时，球跟随挡板移动
         if (!ball.IsLaunched()) {
             float paddleCenterX = paddle.GetRect().x + paddle.GetRect().width / 2;
             ball.ResetToPaddle(paddleCenterX, paddle.GetRect().y);
@@ -58,7 +58,7 @@ int main() {
             ball.Move();
             ball.BounceEdge(screenWidth, screenHeight);
             
-            // ========== 挡板碰撞 ==========
+                       // ========== 挡板碰撞 ==========
             Rectangle paddleRect = paddle.GetRect();
             Vector2 ballPos = ball.GetPosition();
             Vector2 ballSpeed = ball.GetSpeed();
@@ -82,18 +82,19 @@ int main() {
                 
                 // 保持速度大小，向上反弹
                 float speedMagnitude = sqrt(ballSpeed.x * ballSpeed.x + ballSpeed.y * ballSpeed.y);
-                if (speedMagnitude < 5) speedMagnitude = 5;
-                if (speedMagnitude > 12) speedMagnitude = 12;
+                if (speedMagnitude < 8) speedMagnitude = 8;
+                if (speedMagnitude > 15) speedMagnitude = 15;
                 
                 float newSpeedX = speedMagnitude * sin(rad);
                 float newSpeedY = -speedMagnitude * cos(rad);
                 
+                // 设置新速度
                 ball.SetSpeed({newSpeedX, newSpeedY});
                 
-                // 修正位置：放到挡板上面一点，避免重复碰撞
-                ball.ResetToPaddle(paddleRect.x + paddleRect.width / 2, paddleRect.y);
-                // 重新设为发射状态
-                ball.Launch(paddleRect.x + paddleRect.width / 2);
+                // 修正位置到挡板上面
+                ball.SetPosition({ballPos.x, paddleRect.y - ballRadius});
+                // 确保球处于发射状态
+                ball.SetLaunched(true);
             }
             
             // ========== 砖块碰撞 ==========
@@ -143,7 +144,6 @@ int main() {
                 if (lives <= 0) {
                     gameOver = true;
                 } else {
-                    // 重置球到挡板位置，等待发射
                     ball.ResetToPaddle(paddle.GetRect().x + paddle.GetRect().width / 2, paddle.GetRect().y);
                 }
             }
