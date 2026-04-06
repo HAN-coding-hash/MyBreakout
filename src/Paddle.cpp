@@ -10,9 +10,11 @@ void Paddle::MoveLeft() {
     if (rect.x < 0) rect.x = 0;
 }
 
-void Paddle::MoveRight() {
+void Paddle::MoveRight(int screenWidth) {
     rect.x += speed;
-    if (rect.x + rect.width > 800) rect.x = 800 - rect.width;
+    if (rect.x + rect.width > screenWidth) {
+        rect.x = screenWidth - rect.width;
+    }
 }
 
 void Paddle::Draw() {
