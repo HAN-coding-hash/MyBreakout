@@ -1,5 +1,6 @@
 #include "Ball.h"
 #include <cmath>
+#include <cstdlib>
 
 Ball::Ball(float x, float y, float r) {
     position = {x, y};
@@ -14,27 +15,32 @@ void Ball::Move() {
     position.y += speed.y;
 }
 
+#ifndef TEST_MODE
 void Ball::Draw() {
     DrawCircleV(position, radius, RED);
     if (!launched) {
         DrawText("PRESS SPACE", (int)position.x - 55, (int)position.y - 30, 16, DARKGRAY);
     }
 }
+#endif
 
 void Ball::BounceEdge(int screenWidth, int screenHeight) {
     if (!launched) return;
     
+    // 左边界
     if (position.x - radius <= 0) {
         position.x = radius;
-        speed.x = -speed.x;
+        speed.x = std::abs(speed.x);
     }
+    // 右边界
     if (position.x + radius >= screenWidth) {
         position.x = screenWidth - radius;
-        speed.x = -speed.x;
+        speed.x = -std::abs(speed.x);
     }
+    // 上边界
     if (position.y - radius <= 0) {
         position.y = radius;
-        speed.y = -speed.y;
+        speed.y = std::abs(speed.y);
     }
 }
 
