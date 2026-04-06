@@ -5,6 +5,7 @@
 #include "Ball.h"
 #include "Paddle.h"
 #include "Brick.h"
+#include "Config.h"
 #include <vector>
 
 // 游戏状态枚举

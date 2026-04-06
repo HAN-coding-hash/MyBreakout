@@ -1,0 +1,18 @@
+{
+    "window": {
+        "width": 800,
+        "height": 600,
+        "title": "MyBreakout"
+    },
+    "game": {
+        "initialLives": 3,
+        "baseScore": 10,
+        "goldenScore": 10000
+    },
+    "paddle": {
+        "width": 120,
+        "height": 15,
+        "speed": 8,
+        "y": 550
+    }
+}
