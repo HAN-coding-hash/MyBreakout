@@ -8,8 +8,8 @@ Game::Game()
     : screenWidth(800), screenHeight(600),
       ball(400, 530, 10),
       paddle(340, 550, 120, 15),
-      score(0), lives(3), winCount(0),
-      gameOver(false), paused(false), victory(false), gameTime(0.0f) {
+      currentState(GameState::MENU),  // 初始状态为 MENU
+      score(0), lives(3), winCount(0), gameTime(0.0f) {
     
     // 初始化随机种子
     srand((unsigned int)time(nullptr));
@@ -46,35 +46,60 @@ void Game::RandomGoldenBrick() {
 }
 
 void Game::HandleInput() {
-    // 移动挡板
-    if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) paddle.MoveLeft();
-    if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) paddle.MoveRight();
-    
-    // 发射球
-    if (!ball.IsLaunched() && IsKeyPressed(KEY_SPACE)) {
-        ball.Launch(paddle.GetRect().x + paddle.GetRect().width / 2);
+    // 移动挡板（所有状态下都可以移动？只在 MENU 和 PLAYING 时移动）
+    if (currentState == GameState::MENU || currentState == GameState::PLAYING) {
+        if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) paddle.MoveLeft();
+        if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) paddle.MoveRight();
     }
     
-    // 暂停
-    if (IsKeyPressed(KEY_P) && !gameOver) {
-        paused = !paused;
-    }
-    
-    // 重置
-    if (IsKeyPressed(KEY_R) && gameOver) {
-        score = 0;
-        lives = 3;
-        gameOver = false;
-        victory = false;
-        gameTime = 0.0f;
-        InitBricks();
-        RandomGoldenBrick();
-        ball.ResetToPaddle(paddle.GetRect().x + paddle.GetRect().width / 2, paddle.GetRect().y);
+    // 根据当前状态处理输入
+    switch (currentState) {
+        case GameState::MENU:
+            // 按空格发射球，进入 PLAYING 状态
+            if (IsKeyPressed(KEY_SPACE)) {
+                ball.Launch(paddle.GetRect().x + paddle.GetRect().width / 2);
+                currentState = GameState::PLAYING;
+            }
+            break;
+            
+        case GameState::PLAYING:
+            // 按 P 暂停
+            if (IsKeyPressed(KEY_P)) {
+                currentState = GameState::PAUSED;
+            }
+            break;
+            
+        case GameState::PAUSED:
+            // 按 P 继续游戏
+            if (IsKeyPressed(KEY_P)) {
+                currentState = GameState::PLAYING;
+            }
+            break;
+            
+        case GameState::GAME_OVER:
+        case GameState::VICTORY:
+            // 按 R 重置游戏
+            if (IsKeyPressed(KEY_R)) {
+                // 重置所有状态
+                score = 0;
+                lives = 3;
+                gameTime = 0.0f;
+                currentState = GameState::MENU;
+                
+                // 重置砖块
+                InitBricks();
+                RandomGoldenBrick();
+                
+                // 重置球
+                ball.ResetToPaddle(paddle.GetRect().x + paddle.GetRect().width / 2, paddle.GetRect().y);
+            }
+            break;
     }
 }
 
 void Game::Update() {
-    if (gameOver || paused) return;
+    // 只在 PLAYING 状态更新游戏逻辑
+    if (currentState != GameState::PLAYING) return;
     if (!ball.IsLaunched()) return;
     
     // 更新游戏时间
@@ -83,12 +108,6 @@ void Game::Update() {
     // 更新物理
     ball.Move();
     ball.BounceEdge(screenWidth, screenHeight);
-    
-    // 未发射时球跟随挡板
-    if (!ball.IsLaunched()) {
-        float paddleCenterX = paddle.GetRect().x + paddle.GetRect().width / 2;
-        ball.ResetToPaddle(paddleCenterX, paddle.GetRect().y);
-    }
     
     CheckCollisions();
     CheckGameOver();
@@ -164,17 +183,17 @@ void Game::CheckCollisions() {
     if (ball.GetPosition().y + ball.GetRadius() > screenHeight) {
         lives--;
         if (lives <= 0) {
-            gameOver = true;
+            currentState = GameState::GAME_OVER;
         } else {
             ball.ResetToPaddle(paddle.GetRect().x + paddle.GetRect().width / 2, paddle.GetRect().y);
+            currentState = GameState::MENU;  // 回到 MENU 等待发射
         }
     }
 }
 
 void Game::CheckGameOver() {
     if (winCount <= 0) {
-        gameOver = true;
-        victory = true;
+        currentState = GameState::VICTORY;
     }
 }
 
@@ -188,22 +207,36 @@ void Game::Draw() {
     paddle.Draw();
     ball.Draw();
     
-    // UI
+    // UI - 分数和生命
     DrawText(TextFormat("Score: %d", score), 10, 10, 20, DARKGRAY);
     DrawText(TextFormat("Lives: %d", lives), 10, 40, 20, DARKGRAY);
     
-    if (!ball.IsLaunched()) {
-        DrawText("Press SPACE to launch", screenWidth/2 - 120, screenHeight/2 + 100, 20, DARKGRAY);
-    }
-    
-    if (paused) {
-        DrawText("PAUSED", screenWidth/2 - 40, screenHeight/2, 30, RED);
-        DrawText("Press P to resume", screenWidth/2 - 70, screenHeight/2 + 40, 20, DARKGRAY);
-    }
-    
-    if (gameOver) {
-        DrawText(victory ? "YOU WIN!" : "GAME OVER", screenWidth/2 - 60, screenHeight/2, 30, RED);
-        DrawText("Press R to restart", screenWidth/2 - 70, screenHeight/2 + 40, 20, DARKGRAY);
+    // 根据状态显示不同提示
+    switch (currentState) {
+        case GameState::MENU:
+            if (!ball.IsLaunched()) {
+                DrawText("Press SPACE to launch", screenWidth/2 - 120, screenHeight/2 + 100, 20, DARKGRAY);
+            }
+            break;
+            
+        case GameState::PAUSED:
+            DrawText("PAUSED", screenWidth/2 - 40, screenHeight/2, 30, RED);
+            DrawText("Press P to resume", screenWidth/2 - 70, screenHeight/2 + 40, 20, DARKGRAY);
+            break;
+            
+        case GameState::GAME_OVER:
+            DrawText("GAME OVER", screenWidth/2 - 60, screenHeight/2, 30, RED);
+            DrawText("Press R to restart", screenWidth/2 - 70, screenHeight/2 + 40, 20, DARKGRAY);
+            break;
+            
+        case GameState::VICTORY:
+            DrawText("YOU WIN!", screenWidth/2 - 50, screenHeight/2, 30, GREEN);
+            DrawText("Press R to restart", screenWidth/2 - 70, screenHeight/2 + 40, 20, DARKGRAY);
+            break;
+            
+        case GameState::PLAYING:
+            // 游戏中不显示额外提示
+            break;
     }
     
     EndDrawing();

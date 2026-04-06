@@ -7,6 +7,15 @@
 #include "Brick.h"
 #include <vector>
 
+// 游戏状态枚举
+enum class GameState {
+    MENU,       // 菜单/等待发射
+    PLAYING,    // 游戏中
+    PAUSED,     // 暂停
+    GAME_OVER,  // 游戏结束（失败）
+    VICTORY     // 胜利
+};
+
 class Game {
 private:
     // 窗口
@@ -19,16 +28,11 @@ private:
     std::vector<Brick> bricks;
     
     // 游戏状态
+    GameState currentState;  // 替换原来的 gameOver, paused, victory
     int score;
     int lives;
     int winCount;
-    bool gameOver;
-    bool paused;
-    bool victory;
     float gameTime;
-    
-    // 砖块颜色
-    Color brickColors[5];
     
     // 私有方法
     void InitBricks();
