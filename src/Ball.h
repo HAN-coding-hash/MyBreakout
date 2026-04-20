@@ -25,6 +25,7 @@ public:
     bool IsLaunched() { return launched; }
     Vector2 GetPosition() { return position; }
     float GetRadius() { return radius; }
+    void SetRadius(float r) { radius = r; }
 };
 
 #endif
