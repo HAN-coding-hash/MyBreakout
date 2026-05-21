@@ -18,6 +18,7 @@ public:
             f >> data;
         } else {
             data["highScore"] = 0;
+            data["currentLevel"] = 1;
         }
     }
     
@@ -27,11 +28,16 @@ public:
     }
     
     int GetHighScore() { return data["highScore"]; }
+    int GetCurrentLevel() { return data["currentLevel"]; }
     void SetHighScore(int score) { 
         if (score > data["highScore"]) {
             data["highScore"] = score; 
             Save();
         }
+    }
+    void SetCurrentLevel(int level) { 
+        data["currentLevel"] = level; 
+        Save();
     }
 };
 

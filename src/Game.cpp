@@ -4,6 +4,8 @@
 #include <ctime>
 #include <cmath>
 #include <algorithm>
+#include "SaveManager.h"
+#include "LevelManager.h"
 
 Game::Game()
     : screenWidth(800), screenHeight(600),
@@ -18,22 +20,17 @@ Game::Game()
 
     srand((unsigned int)time(nullptr));
     
-    // 初始化砖块
-    for (int row = 0; row < 5; row++) {
-        for (int col = 0; col < 8; col++) {
-            bricks.emplace_back(50 + col * 95, 80 + row * 35, 85, 25);
-        }
-    }
-    winCount = bricks.size();
+    // 加载存档的关卡
+    int savedLevel = saveManager.GetCurrentLevel();
+    levelManager.LoadLevel(savedLevel);
+    
+    // 初始化砖块（根据当前关卡）
+    InitBricks();
     
     // 随机金砖
-    if (!bricks.empty()) {
-        int goldenIndex = rand() % bricks.size();
-        bricks[goldenIndex].SetGolden(true);
-        printf("金砖位置: 行%d 列%d\n", goldenIndex / 8, goldenIndex % 8);
-    }
+    RandomGoldenBrick();
 
-    InitWindow(screenWidth, screenHeight, "MyBreakout - PowerUp Modes");
+    InitWindow(screenWidth, screenHeight, "MyBreakout - Multi Level");
     SetTargetFPS(60);
 }
 
@@ -41,20 +38,43 @@ Game::~Game() {
     CloseWindow();
 }
 
+void Game::InitBricks() {
+    bricks.clear();
+    LevelData& level = levelManager.GetCurrentLevel();
+    
+    for (int row = 0; row < level.rows; row++) {
+        for (int col = 0; col < level.cols; col++) {
+            if (level.bricks[row][col] == 1) {
+                bricks.emplace_back(
+                    level.startX + col * level.spacingX,
+                    level.startY + row * level.spacingY,
+                    level.brickWidth, level.brickHeight
+                );
+            }
+        }
+    }
+    winCount = bricks.size();
+}
+
+void Game::RandomGoldenBrick() {
+    if (!bricks.empty()) {
+        int goldenIndex = rand() % bricks.size();
+        bricks[goldenIndex].SetGolden(true);
+        printf("金砖位置: 行%d 列%d\n", goldenIndex / 8, goldenIndex % 8);
+    }
+}
+
 void Game::HandleInput() {
-    // 移动挡板
     if (currentState == GameState::MENU || currentState == GameState::PLAYING) {
         if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) paddle.MoveLeft();
         if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) paddle.MoveRight(screenWidth);
     }
 
-    // 未发射时，球跟随挡板移动
     if (!ball.IsLaunched()) {
         float paddleCenterX = paddle.GetRect().x + paddle.GetRect().width / 2;
         ball.ResetToPaddle(paddleCenterX, paddle.GetRect().y);
     }
 
-    // 模式选择
     if (currentState == GameState::PLAYING) {
         if (IsKeyPressed(KEY_ONE)) {
             currentMode = PowerUpMode::SPLIT;
@@ -64,7 +84,6 @@ void Game::HandleInput() {
         if (IsKeyPressed(KEY_TWO)) {
             currentMode = PowerUpMode::SLOW_TIME;
             modeTimer = 10.0f;
-            // 减速
             Vector2 sp = ball.GetSpeed();
             ball.SetSpeed({sp.x * 0.5f, sp.y * 0.5f});
             printf("★★★ 时停模式激活！★★★\n");
@@ -77,7 +96,6 @@ void Game::HandleInput() {
         }
     }
 
-    // 模式计时
     if (currentMode != PowerUpMode::NONE) {
         modeTimer -= GetFrameTime();
         if (modeTimer <= 0) {
@@ -118,15 +136,11 @@ void Game::HandleInput() {
                 currentState = GameState::MENU;
                 currentMode = PowerUpMode::NONE;
                 extraBalls.clear();
-                bricks.clear();
-                for (int row = 0; row < 5; row++) {
-                    for (int col = 0; col < 8; col++) {
-                        bricks.emplace_back(50 + col * 95, 80 + row * 35, 85, 25);
-                    }
-                }
-                int goldenIndex = rand() % bricks.size();
-                bricks[goldenIndex].SetGolden(true);
-                winCount = bricks.size();
+                // 重置到第一关
+                levelManager.LoadLevel(1);
+                saveManager.SetCurrentLevel(1);
+                InitBricks();
+                RandomGoldenBrick();
                 ball.ResetToPaddle(paddle.GetRect().x + paddle.GetRect().width / 2, paddle.GetRect().y);
                 ball.SetRadius(originalBallRadius);
             }
@@ -142,13 +156,11 @@ void Game::Update() {
     ball.Move();
     ball.BounceEdge(screenWidth, screenHeight);
 
-    // 更新额外球
     for (auto& extraBall : extraBalls) {
         extraBall.Move();
         extraBall.BounceEdge(screenWidth, screenHeight);
     }
 
-    // 挡板碰撞
     Rectangle paddleRect = paddle.GetRect();
     Vector2 ballPos = ball.GetPosition();
     Vector2 ballSpeed = ball.GetSpeed();
@@ -178,7 +190,6 @@ void Game::Update() {
         ball.SetPosition({ballPos.x, paddleRect.y - ballRadius});
         ball.SetLaunched(true);
 
-        // 分裂模式
         if (currentMode == PowerUpMode::SPLIT && extraBalls.empty()) {
             Ball newBall(ballPos.x, paddleRect.y - ballRadius, originalBallRadius);
             newBall.SetSpeed({-newSpeedX, newSpeedY});
@@ -192,11 +203,9 @@ void Game::Update() {
     for (auto& brick : bricks) {
         if (brick.IsActive()) {
             Rectangle brickRect = brick.GetRect();
-            // 碰撞检测
             if (CheckCollisionCircleRec(ball.GetPosition(), ball.GetRadius(), brickRect)) {
                 brick.SetActive(false);
                 
-                // 计算反弹方向
                 Vector2 currentSpeed = ball.GetSpeed();
                 float ballCenterX = ball.GetPosition().x;
                 float ballCenterY = ball.GetPosition().y;
@@ -219,13 +228,14 @@ void Game::Update() {
                 } else {
                     ball.SetSpeed({currentSpeed.x, -currentSpeed.y});
                 }
+                
                 if (brick.IsGolden()) {
                     score += 10000;
-            if (score > saveManager.GetHighScore()) saveManager.SetHighScore(score);
+                    if (score > saveManager.GetHighScore()) saveManager.SetHighScore(score);
                     printf("★★★ 金砖！+10000分！★★★\n");
                 } else {
                     score += 10;
-            if (score > saveManager.GetHighScore()) saveManager.SetHighScore(score);
+                    if (score > saveManager.GetHighScore()) saveManager.SetHighScore(score);
                 }
                 winCount--;
                 break;
@@ -240,10 +250,10 @@ void Game::Update() {
                 brick.SetActive(false);
                 if (brick.IsGolden()) {
                     score += 10000;
-            if (score > saveManager.GetHighScore()) saveManager.SetHighScore(score);
+                    if (score > saveManager.GetHighScore()) saveManager.SetHighScore(score);
                 } else {
                     score += 10;
-            if (score > saveManager.GetHighScore()) saveManager.SetHighScore(score);
+                    if (score > saveManager.GetHighScore()) saveManager.SetHighScore(score);
                 }
                 winCount--;
                 break;
@@ -251,13 +261,11 @@ void Game::Update() {
         }
     }
 
-    // 移除飞出屏幕的额外球
     extraBalls.erase(std::remove_if(extraBalls.begin(), extraBalls.end(),
         [screenHeight = screenHeight](Ball& b) {
             return b.GetPosition().y + b.GetRadius() > screenHeight;
         }), extraBalls.end());
 
-    // 主球掉底
     if (ball.GetPosition().y + ball.GetRadius() > screenHeight) {
         lives--;
         if (lives <= 0) {
@@ -271,9 +279,20 @@ void Game::Update() {
         }
     }
 
-    if (winCount <= 0) {
+    // 胜利：通关后进入下一关
+    if (score >= 200) {
         saveManager.SetHighScore(score);
-        currentState = GameState::VICTORY;
+        if (levelManager.HasNextLevel()) {
+            levelManager.NextLevel();
+            saveManager.SetCurrentLevel(levelManager.GetCurrentLevelNum());
+            InitBricks();
+            RandomGoldenBrick();
+            ball.ResetToPaddle(paddle.GetRect().x + paddle.GetRect().width / 2, paddle.GetRect().y);
+            currentState = GameState::MENU;
+            printf("通关！进入下一关: %s\n", levelManager.GetCurrentLevel().name.c_str());
+        } else {
+            currentState = GameState::VICTORY;
+        }
     }
 }
 
@@ -289,6 +308,7 @@ void Game::Draw() {
     DrawText(TextFormat("Score: %d", score), 10, 10, 20, DARKGRAY);
     DrawText(TextFormat("High Score: %d", saveManager.GetHighScore()), screenWidth - 200, 40, 16, DARKGRAY);
     DrawText(TextFormat("Lives: %d", lives), 10, 40, 20, DARKGRAY);
+    DrawText(TextFormat("Level: %d", levelManager.GetCurrentLevelNum()), screenWidth - 100, 20, 16, DARKGRAY);
 
     if (currentMode != PowerUpMode::NONE) {
         const char* modeText = "";
