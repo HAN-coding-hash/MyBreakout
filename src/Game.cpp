@@ -221,9 +221,11 @@ void Game::Update() {
                 }
                 if (brick.IsGolden()) {
                     score += 10000;
+            if (score > saveManager.GetHighScore()) saveManager.SetHighScore(score);
                     printf("★★★ 金砖！+10000分！★★★\n");
                 } else {
                     score += 10;
+            if (score > saveManager.GetHighScore()) saveManager.SetHighScore(score);
                 }
                 winCount--;
                 break;
@@ -238,8 +240,10 @@ void Game::Update() {
                 brick.SetActive(false);
                 if (brick.IsGolden()) {
                     score += 10000;
+            if (score > saveManager.GetHighScore()) saveManager.SetHighScore(score);
                 } else {
                     score += 10;
+            if (score > saveManager.GetHighScore()) saveManager.SetHighScore(score);
                 }
                 winCount--;
                 break;
@@ -268,6 +272,7 @@ void Game::Update() {
     }
 
     if (winCount <= 0) {
+        saveManager.SetHighScore(score);
         currentState = GameState::VICTORY;
     }
 }
@@ -282,6 +287,7 @@ void Game::Draw() {
     for (auto& extraBall : extraBalls) extraBall.Draw();
 
     DrawText(TextFormat("Score: %d", score), 10, 10, 20, DARKGRAY);
+    DrawText(TextFormat("High Score: %d", saveManager.GetHighScore()), screenWidth - 200, 40, 16, DARKGRAY);
     DrawText(TextFormat("Lives: %d", lives), 10, 40, 20, DARKGRAY);
 
     if (currentMode != PowerUpMode::NONE) {

@@ -5,6 +5,7 @@
 #include "Ball.h"
 #include "Paddle.h"
 #include "Brick.h"
+#include "SaveManager.h"
 #include <vector>
 
 // 游戏状态枚举
@@ -26,6 +27,7 @@ enum class PowerUpMode {
 
 class Game {
 private:
+    SaveManager saveManager;
     int screenWidth;
     int screenHeight;
     
